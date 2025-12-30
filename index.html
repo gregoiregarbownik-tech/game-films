@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Jeu des Films</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #162447);
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { color: #ffcc00; margin-bottom: 15px; }
+  input, button, select { padding: 10px 15px; font-size: 16px; margin: 5px; border-radius: 8px; border: none; outline: none; }
+  button { cursor: pointer; background: #ffcc00; color: #111; font-weight: 600; transition: transform 0.2s, background 0.2s; }
+  button:hover { transform: scale(1.05); background: #e6b800; }
+  #bestScoreBox, #scoreBox { background: #222; display: inline-block; padding: 10px 20px; border-radius: 12px; margin: 10px; border: 1px solid #fff; }
+  #filmGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-top: 20px; }
+  .filmCard { display: flex; flex-direction: column; align-items: center; background: #222; padding: 5px; border-radius: 10px; transition: transform 0.2s, box-shadow 0.2s; }
+  .filmCard:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(255,204,0,0.5); }
+  .filmCard img { width: 100px; height: 150px; border-radius: 6px; margin-bottom: 5px; }
+  .timerControls button { background: #00b894; color: #fff; }
+  .timerControls button:hover { background: #019f7a; }
+  @media(max-width:500px){ input{width:180px;} .filmCard img{width:80px;height:120px;} }
+</style>
+</head>
+<body>
+
+<h1>🎬 Jeu des Films</h1>
+
+<div>
+  <label for="timerInput">Durée (minutes) :</label>
+  <input type="number" id="timerInput" value="60" min="1" max="180">
+  <label for="lettreInput">Mode :</label>
+  <select id="lettreInput">
+    <option value="">Tous les films</option>
+  </select>
+  <button onclick="demarrerJeu()">Démarrer</button>
+</div>
+
+<div style="margin-top:15px;">
+  <input type="text" id="filmInput" placeholder="Titre exact du film" disabled>
+  <button onclick="validerFilm()" disabled>Valider</button>
+</div>
+
+<div id="scoreBox">Score : <span id="score">0</span></div>
+<div id="bestScoreBox">Meilleur score : <span id="bestScore">0</span></div>
+<button onclick="resetBestScore()">Réinitialiser le meilleur score</button>
+
+<p>Temps restant : <span id="temps">--:--:--</span></p>
+<div class="timerControls">
+  <button onclick="pauseTimer()">⏸️ Pause</button>
+  <button onclick="reprendreTimer()">▶️ Reprendre</button>
+</div>
+
+<div id="filmGrid"></div>
+
+<script>
+const select = document.getElementById('lettreInput');
+for(let i=65;i<=90;i++){
+  const letter = String.fromCharCode(i);
+  const option = document.createElement('option');
+  option.value = letter.toLowerCase();
+  option.textContent = `Films commençant par ${letter}`;
+  select.appendChild(option);
+}
+
+let score=0;
+let filmsTrouves=[];
+let timer=null;
+let temps=0;
+
+const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
+const omdbKey="10a96ebb";
+const tmdbBase="https://api.themoviedb.org/3";
+
+let bestScore=parseInt(localStorage.getItem('bestScore'))||0;
+document.getElementById("bestScore").textContent=bestScore;
+
+function normaliser(str){ return str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/['’]/g,"").toLowerCase().trim(); }
+function resetBestScore(){ localStorage.setItem('bestScore','0'); bestScore=0; document.getElementById("bestScore").textContent=bestScore; }
+
+function demarrerJeu(){
+  const dureeMinutes=parseInt(document.getElementById("timerInput").value)||60;
+  temps=dureeMinutes*60;
+  score=0;
+  filmsTrouves=[];
+  document.getElementById("score").textContent=score;
+  document.getElementById("filmGrid").innerHTML="";
+  document.getElementById("filmInput").disabled=false;
+  document.querySelector("button[onclick='validerFilm()']").disabled=false;
+  if(timer) clearInterval(timer);
+  timer=setInterval(updateTimer,1000);
+  updateTimer();
+}
+
+function updateTimer(){
+  if(temps<=0){
+    clearInterval(timer);
+    document.getElementById("filmInput").disabled=true;
+    document.querySelector("button[onclick='validerFilm()']").disabled=true;
+    alert("⏰ Temps écoulé ! Score final : "+score);
+    return;
+  }
+  let h=Math.floor(temps/3600), m=Math.floor((temps%3600)/60), s=temps%60;
+  document.getElementById("temps").textContent=`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+  temps--;
+}
+
+function pauseTimer(){ if(timer){ clearInterval(timer); timer=null; } }
+function reprendreTimer(){ if(!timer && temps>0){ timer=setInterval(updateTimer,1000); } }
+
+async function validerFilm(){
+  const input=document.getElementById("filmInput");
+  const titreRecherche=input.value.trim();
+  if(!titreRecherche) return;
+  const titreMin=normaliser(titreRecherche);
+  if(filmsTrouves.includes(titreMin)){ alert("⚠️ Film déjà trouvé"); input.value=""; return; }
+
+  const lettreChoisie=document.getElementById("lettreInput").value.toLowerCase();
+
+  try{
+    const urlTmdb=`${tmdbBase}/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titreRecherche)}&language=fr-FR`;
+    const resTmdb=await fetch(urlTmdb);
+    const dataTmdb=await resTmdb.json();
+    let film=null;
+    if(dataTmdb.results && dataTmdb.results.length>0){
+      for(let f of dataTmdb.results){
+        if(normaliser(f.title)===titreMin){ 
+          if(lettreChoisie && !f.title.toLowerCase().startsWith(lettreChoisie)){ alert("❌ Film ne commence pas par la lettre choisie"); input.value=""; return; }
+          film=f; break; 
+        }
+      }
+    }
+
+    if(!film){
+      const urlOmdb=`https://www.omdbapi.com/?t=${encodeURIComponent(titreRecherche)}&apikey=${omdbKey}`;
+      const resOmdb=await fetch(urlOmdb);
+      const dataOmdb=await resOmdb.json();
+      if(dataOmdb.Response==="True" && normaliser(dataOmdb.Title)===titreMin){
+        if(lettreChoisie && !dataOmdb.Title.toLowerCase().startsWith(lettreChoisie)){ alert("❌ Film ne commence pas par la lettre choisie"); input.value=""; return; }
+        film={title:dataOmdb.Title, release_date:dataOmdb.Year, poster_path:dataOmdb.Poster!=="N/A"?dataOmdb.Poster:""};
+      }
+    }
+
+    if(!film){ alert("❌ Tape le titre exact du film !"); input.value=""; return; }
+
+    filmsTrouves.push(titreMin);
+    score++;
+    document.getElementById("score").textContent=score;
+
+    if(score>bestScore){ bestScore=score; localStorage.setItem('bestScore',bestScore); document.getElementById("bestScore").textContent=bestScore; }
+
+    const filmCard=document.createElement("div");
+    filmCard.className="filmCard";
+    const img=document.createElement("img");
+    img.src=film.poster_path?(film.poster_path.startsWith("http")?film.poster_path:`https://image.tmdb.org/t/p/w200${film.poster_path}`):"";
+    img.alt=film.title;
+    filmCard.appendChild(img);
+    const span=document.createElement("span");
+    span.textContent=`${film.title} (${film.release_date?film.release_date.slice(0,4):"n/a"})`;
+    filmCard.appendChild(span);
+    document.getElementById("filmGrid").appendChild(filmCard);
+    input.value="";
+
+  }catch(err){ alert("⚠️ Erreur de connexion à la base de films"); console.error(err); }
+}
+
+document.getElementById("filmInput").addEventListener("keydown",e=>{if(e.key==="Enter") validerFilm();});
+</script>
+
+</body>
+</html>
