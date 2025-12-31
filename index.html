@@ -195,7 +195,9 @@ async function validerFilm() {
     return;
   }
 
-  const titreNettoye = titreSansDeterminant(film.title);
+  // 🔥 CORRECTION DÉFINITIVE ICI 🔥
+  const titreNettoye = normaliser(titreSansDeterminant(film.title));
+
   if (lettre && !titreNettoye.startsWith(lettre)) {
     alert("❌ Mauvaise lettre");
     return;
