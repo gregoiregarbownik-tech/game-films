@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Jeu des Films</title>
+<title>🎬 Jeu des Films</title>
 <style>
-body { font-family: Arial; background:#111; color:white; text-align:center }
-input, select, button { padding:8px; margin:5px }
-#films { max-height:200px; overflow:auto; border:1px solid #555; padding:5px }
-.joueur { font-weight:bold }
+body{font-family:Arial;background:#111;color:#fff;text-align:center}
+input,select,button{padding:8px;margin:5px}
+#films{max-height:220px;overflow:auto;border:1px solid #555;padding:5px}
+#multiConfig{border:1px solid #555;padding:10px;margin-top:10px}
 </style>
 </head>
 
@@ -15,7 +15,6 @@ input, select, button { padding:8px; margin:5px }
 
 <h1>🎬 Jeu des Films</h1>
 
-<!-- CONFIG -->
 <label>Mode :</label>
 <select id="mode" onchange="onModeChange()">
   <option value="solo">Solo</option>
@@ -39,13 +38,11 @@ input, select, button { padding:8px; margin:5px }
 <label>Genre :</label>
 <select id="genre">
   <option value="">Tous</option>
-  <option value="16">Animation</option>
 </select>
 
-<!-- MULTI CONFIG -->
 <div id="multiConfig" style="display:none;">
   <h3>Multijoueur</h3>
-  <label>Joueurs :</label>
+  <label>Nombre de joueurs :</label>
   <select id="nbJoueurs" onchange="updatePseudos()">
     <option value="2">2</option>
     <option value="3">3</option>
@@ -59,7 +56,6 @@ input, select, button { padding:8px; margin:5px }
 
 <hr>
 
-<!-- JEU -->
 <div id="game" style="display:none;">
   <h2 id="turn"></h2>
   <h3 id="timer"></h3>
@@ -68,147 +64,169 @@ input, select, button { padding:8px; margin:5px }
   <button onclick="validerFilm()">Valider</button>
 
   <h3 id="scores"></h3>
-
   <div id="films"></div>
 </div>
 
 <script>
-const tmdbKey = "00f966a09a2db9feeb0ceedc1c33e89d";
-let joueurs=[], scores=[], joueurActuel=0;
-let filmsJoues=[], timerInt, timeLeft;
-let selectedLetter="", selectedGenre="";
+/* CONFIG */
+const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
 
-const determinants = ["le","la","les","l","un","une","des","the","a","an"];
+/* STATE */
+let joueurs=[],scores=[],joueurActuel=0;
+let filmsJoues=[];
+let timerInt,timeLeft;
+let selectedLetter="",selectedGenre="";
+
+/* UTILS */
+const determinants=["le","la","les","l","un","une","des","the","a","an"];
 
 function normalize(t){
-  return t.toLowerCase()
-   .replace(/['’]/g,"")
-   .replace(/[^a-z0-9]/g,"")
-   .trim();
+ return t.toLowerCase()
+ .replace(/['’]/g,"")
+ .replace(/[^a-z0-9]/g,"")
+ .trim();
 }
 
 function stripDeterminant(t){
-  let w = t.toLowerCase().trim();
-  for(let d of determinants){
-    if(w.startsWith(d+" ")) return w.slice(d.length+1);
-    if(w.startsWith(d+"'")) return w.slice(d.length+1);
-  }
-  return w;
+ let w=t.toLowerCase().trim();
+ for(let d of determinants){
+  if(w.startsWith(d+" "))return w.slice(d.length+1);
+  if(w.startsWith(d+"'"))return w.slice(d.length+1);
+ }
+ return w;
 }
 
-/* INIT */
+/* INIT LETTERS */
 for(let i=65;i<=90;i++){
-  let o=document.createElement("option");
-  o.value=o.textContent=String.fromCharCode(i);
-  letter.appendChild(o);
+ let o=document.createElement("option");
+ o.value=o.textContent=String.fromCharCode(i);
+ letter.appendChild(o);
 }
 
+/* LOAD GENRES */
+async function chargerGenres(){
+ const res=await fetch(
+  `https://api.themoviedb.org/3/genre/movie/list?api_key=${tmdbKey}&language=fr-FR`
+ );
+ const data=await res.json();
+ data.genres.forEach(g=>{
+  let o=document.createElement("option");
+  o.value=g.id;
+  o.textContent=g.name;
+  genre.appendChild(o);
+ });
+}
+chargerGenres();
+
+/* MULTI UI */
 function onModeChange(){
-  multiConfig.style.display = mode.value==="multi"?"block":"none";
+ multiConfig.style.display=mode.value==="multi"?"block":"none";
 }
 
 function updatePseudos(){
-  pseudos.innerHTML="";
-  let n=nbJoueurs.value;
-  for(let i=0;i<n;i++){
-    pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;
-  }
+ pseudos.innerHTML="";
+ for(let i=0;i<nbJoueurs.value;i++){
+  pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;
+ }
 }
-
 updatePseudos();
 
 /* START */
 function startGame(){
-  filmsJoues=[];
-  joueurs=[];
-  scores=[];
-  joueurActuel=0;
+ filmsJoues=[];
+ joueurs=[];
+ scores=[];
+ joueurActuel=0;
+ films.innerHTML="";
 
-  selectedLetter=letter.value;
-  selectedGenre=genre.value;
+ selectedLetter=letter.value;
+ selectedGenre=genre.value;
 
-  if(mode.value==="multi"){
-    let n=nbJoueurs.value;
-    for(let i=0;i<n;i++){
-      joueurs.push(document.getElementById("p"+i).value||`Joueur ${i+1}`);
-      scores.push(0);
-    }
-  } else {
-    joueurs=["Joueur"];
-    scores=[0];
+ if(mode.value==="multi"){
+  for(let i=0;i<nbJoueurs.value;i++){
+   joueurs.push(document.getElementById("p"+i).value||`Joueur ${i+1}`);
+   scores.push(0);
   }
+ }else{
+  joueurs=["Joueur"];
+  scores=[0];
+ }
 
-  timeLeft=parseInt(time.value)*60;
-  game.style.display="block";
-  updateUI();
-  startTimer();
+ timeLeft=parseInt(time.value)*60;
+ game.style.display="block";
+ updateUI();
+ startTimer();
 }
 
+/* TIMER */
 function startTimer(){
-  clearInterval(timerInt);
-  timerInt=setInterval(()=>{
-    timeLeft--;
-    timer.textContent="⏱️ "+timeLeft+"s";
-    if(timeLeft<=0){
-      clearInterval(timerInt);
-      alert("Fin !\n"+joueurs.map((j,i)=>`${j}: ${scores[i]}`).join("\n"));
-    }
-  },1000);
+ clearInterval(timerInt);
+ timerInt=setInterval(()=>{
+  timeLeft--;
+  timer.textContent="⏱️ "+timeLeft+"s";
+  if(timeLeft<=0){
+   clearInterval(timerInt);
+   alert("Fin de la partie\n"+joueurs.map((j,i)=>`${j} : ${scores[i]}`).join("\n"));
+  }
+ },1000);
 }
 
+/* UI */
 function updateUI(){
-  turn.textContent="Tour de : "+joueurs[joueurActuel];
-  scoresDiv=scores.map((s,i)=>`${joueurs[i]} : ${s}`).join(" | ");
-  scoresEl=document.getElementById("scores");
-  scoresEl.textContent=scoresDiv;
+ turn.textContent="Tour de : "+joueurs[joueurActuel];
+ scores.textContent=joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
 }
 
 /* VALIDATION */
 async function validerFilm(){
-  let input=inputFilm.value.trim();
-  if(!input) return;
+ let input=inputFilm.value.trim();
+ if(!input)return;
 
-  let clean=normalize(stripDeterminant(input));
-  if(filmsJoues.includes(clean)){
-    alert("Déjà utilisé !");
-    return;
+ let clean=normalize(stripDeterminant(input));
+ if(filmsJoues.includes(clean)){
+  alert("Déjà utilisé !");
+  return;
+ }
+
+ const res=await fetch(
+  `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`
+ );
+ const data=await res.json();
+
+ let film=data.results?.find(f=>{
+  let t1=normalize(stripDeterminant(f.title||""));
+  let t2=normalize(stripDeterminant(f.original_title||""));
+  return clean===t1||clean===t2;
+ });
+
+ if(!film){alert("Film introuvable");return;}
+
+ /* GENRE SAFE */
+ if(selectedGenre){
+  const d=await fetch(
+   `https://api.themoviedb.org/3/movie/${film.id}?api_key=${tmdbKey}&language=fr-FR`
+  );
+  const det=await d.json();
+  if(!det.genres.map(g=>g.id).includes(parseInt(selectedGenre))){
+   alert("Mauvais genre");
+   return;
   }
+ }
 
-  let res=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`);
-  let data=await res.json();
+ /* LETTER */
+ let base=stripDeterminant(film.title||film.original_title);
+ if(selectedLetter && base[0].toUpperCase()!==selectedLetter){
+  alert("Mauvaise lettre");
+  return;
+ }
 
-  let film=data.results?.find(f=>{
-    let t1=normalize(stripDeterminant(f.title||""));
-    let t2=normalize(stripDeterminant(f.original_title||""));
-    return clean===t1||clean===t2;
-  });
+ filmsJoues.push(clean);
+ scores[joueurActuel]++;
+ joueurActuel=(joueurActuel+1)%joueurs.length;
 
-  if(!film){ alert("Film introuvable"); return; }
-
-  /* GENRE SAFE CHECK */
-  if(selectedGenre){
-    let d=await fetch(`https://api.themoviedb.org/3/movie/${film.id}?api_key=${tmdbKey}&language=fr-FR`);
-    let det=await d.json();
-    let gids=det.genres.map(g=>g.id);
-    if(!gids.includes(parseInt(selectedGenre))){
-      alert("Mauvais genre");
-      return;
-    }
-  }
-
-  let base=stripDeterminant(film.title||film.original_title);
-  if(selectedLetter && base[0].toUpperCase()!==selectedLetter){
-    alert("Mauvaise lettre");
-    return;
-  }
-
-  filmsJoues.push(clean);
-  scores[joueurActuel]++;
-  joueurActuel=(joueurActuel+1)%joueurs.length;
-
-  films.innerHTML=`<div>${film.title}</div>`+films.innerHTML;
-  inputFilm.value="";
-  updateUI();
+ films.innerHTML=`<div>${film.title}</div>`+films.innerHTML;
+ inputFilm.value="";
+ updateUI();
 }
 </script>
 
