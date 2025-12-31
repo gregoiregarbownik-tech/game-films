@@ -19,7 +19,7 @@ button:hover { background:#e6b800;}
 @keyframes pop {
   0% { transform: scale(0.5); opacity:0; }
   50% { transform: scale(1.2); opacity:1; }
-  100% { transform: scale(1); }
+  100% { transform: scale(1); opacity:1; }
 }
 .filmCard.pop { animation: pop 0.4s ease forwards; }
 @keyframes scorePulse {
@@ -151,6 +151,8 @@ function majJoueurActif(){
   if(document.getElementById("modeJeu").value=="multi"){
     const elem = document.getElementById("joueurActif");
     elem.textContent="🎮 Joueur actuel : "+joueurs[joueurActuel].nom;
+    elem.classList.remove("activePlayer");
+    void elem.offsetWidth; // force reflow
     elem.classList.add("activePlayer");
     setTimeout(()=>elem.classList.remove("activePlayer"),300);
   } else {
@@ -224,18 +226,24 @@ async function validerFilm(){
   if(lettre && !titreNettoye.startsWith(lettre)){ alert("❌ Mauvaise lettre"); return; }
 
   filmsTrouves.push(titreNorm);
-  joueurs[joueurActuel].score++;
-  const scoreDiv=document.getElementById("scoreJ"+joueurActuel);
-  scoreDiv.textContent=`${joueurs[joueurActuel].nom} : ${joueurs[joueurActuel].score}`;
-  scoreDiv.classList.add("point");
-  setTimeout(()=>scoreDiv.classList.remove("point"),400);
 
-  const card=document.createElement("div"); card.className="filmCard pop";
+  // Score joueur actif
+  const scoreDiv=document.getElementById("scoreJ"+joueurActuel);
+  joueurs[joueurActuel].score++;
+  scoreDiv.textContent=`${joueurs[joueurActuel].nom} : ${joueurs[joueurActuel].score}`;
+  scoreDiv.classList.remove("point");
+  void scoreDiv.offsetWidth; // force reflow
+  scoreDiv.classList.add("point");
+
+  // Film card
+  const card=document.createElement("div"); 
+  card.className="filmCard"; 
+  document.getElementById("filmGrid").prepend(card); // ajouter d’abord
+  card.classList.add("pop"); // déclencher animation
   const img=document.createElement("img");
   img.src=film.poster_path?.startsWith("http")?film.poster_path:`https://image.tmdb.org/t/p/w200${film.poster_path}`;
   card.appendChild(img);
   const titleDiv=document.createElement("div"); titleDiv.textContent=film.title; card.appendChild(titleDiv);
-  document.getElementById("filmGrid").prepend(card);
 
   input.value="";
   joueurActuel = (joueurActuel + 1) % joueurs.length;
@@ -243,7 +251,6 @@ async function validerFilm(){
 }
 
 document.getElementById("filmInput").addEventListener("keydown",e=>{ if(e.key==="Enter") validerFilm(); });
-
 </script>
 </body>
 </html>
