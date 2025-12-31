@@ -148,7 +148,6 @@ function majJoueurActif(){
 
 // ===== JEU =====
 function demarrerJeu(){
-  // --- réinitialisations ---
   filmsTrouves = []; 
   joueurActuel=0;
   selectedGenreId=document.getElementById("genreInput").value;
@@ -159,7 +158,6 @@ function demarrerJeu(){
   const duree=parseInt(document.getElementById("timerInput").value); temps=duree*60;
   if(timer) clearInterval(timer); timer=setInterval(updateTimer,1000); updateTimer();
 
-  // Mode lettre aléatoire initial
   if(document.getElementById("lettreInput").value=="random"){ 
     currentLetter = choisirLettreAleatoire(); 
     alert("Nouvelle lettre : "+currentLetter.toUpperCase()); 
@@ -181,15 +179,23 @@ function finPartie(){
 
 // ===== VALIDER FILM =====
 async function validerFilm(){
-  const input=document.getElementById("filmInput"); const titre=input.value.trim(); if(!titre) return;
+  const input=document.getElementById("filmInput"); 
+  const titre=input.value.trim(); 
+  if(!titre) return;
   const titreNorm=normaliser(titreSansDeterminant(titre));
   if(filmsTrouves.includes(titreNorm)){ alert("Film déjà trouvé !"); return; }
 
   // Rechercher film via TMDB
   const res=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titre)}&language=fr-FR`);
   const data=await res.json(); 
-  let film=data.results?.find(f=>normaliser(titreSansDeterminant(f.title))===titreNorm);
 
+  // Acceptation titres français ou originaux
+  let film=data.results?.find(f => 
+    normaliser(titreSansDeterminant(f.title))===titreNorm || 
+    (f.original_title && normaliser(titreSansDeterminant(f.original_title))===titreNorm)
+  );
+
+  // Backup OMDB
   if(!film){
     const res2=await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(titre)}&apikey=${omdbKey}`);
     const data2=await res2.json();
