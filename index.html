@@ -107,7 +107,11 @@ const omdbKey = "10a96ebb";
 
 // ===== UTILS =====
 function normaliser(txt) {
-  return txt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return txt
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function titreSansDeterminant(titre) {
@@ -167,15 +171,19 @@ async function validerFilm() {
 
   const lettre = document.getElementById("lettreInput").value;
 
-  // TMDB
-  const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titre)}&language=fr-FR`);
+  // ===== TMDB =====
+  const res = await fetch(
+    `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titre)}&language=fr-FR`
+  );
   const data = await res.json();
 
   let film = data.results?.find(f => normaliser(f.title) === titreNorm);
 
-  // OMDB fallback
+  // ===== OMDB (secours) =====
   if (!film) {
-    const res2 = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(titre)}&apikey=${omdbKey}`);
+    const res2 = await fetch(
+      `https://www.omdbapi.com/?t=${encodeURIComponent(titre)}&apikey=${omdbKey}`
+    );
     const data2 = await res2.json();
     if (data2.Response === "True" && normaliser(data2.Title) === titreNorm) {
       film = { title: data2.Title, poster_path: data2.Poster };
@@ -205,12 +213,16 @@ async function validerFilm() {
 
   const card = document.createElement("div");
   card.className = "filmCard";
+
   const img = document.createElement("img");
   img.src = film.poster_path?.startsWith("http")
     ? film.poster_path
     : `https://image.tmdb.org/t/p/w200${film.poster_path}`;
   card.appendChild(img);
-  card.appendChild(document.createTextNode(film.title));
+
+  const title = document.createElement("div");
+  title.textContent = film.title;
+  card.appendChild(title);
 
   document.getElementById("filmGrid").prepend(card);
   input.value = "";
@@ -223,4 +235,3 @@ document.getElementById("filmInput").addEventListener("keydown", e => {
 
 </body>
 </html>
-
