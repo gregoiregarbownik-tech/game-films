@@ -90,9 +90,13 @@ function normaliser(txt){ return txt.normalize("NFD").replace(/[\u0300-\u036f]/g
 function titreSansDeterminant(titre){ return titre.toLowerCase().replace(/^(l['’]|le |la |les |un |une |the )/i,"").trim();}
 
 // ===== MULTIJOUEUR =====
-document.getElementById("modeJeu").addEventListener("change",e=>{
-  if(e.target.value=="multi") document.getElementById("multiConfig").style.display="block";
-  else document.getElementById("multiConfig").style.display="none";
+document.getElementById("modeJeu").addEventListener("change", e => {
+  if(e.target.value=="multi") {
+    document.getElementById("multiConfig").style.display="block";
+  } else {
+    document.getElementById("multiConfig").style.display="none";
+    document.getElementById("joueursInput").style.display="none";
+  }
 });
 
 function configurerJoueurs(){
