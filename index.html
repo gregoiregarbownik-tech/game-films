@@ -111,7 +111,10 @@ function normaliser(txt) {
 }
 
 function titreSansDeterminant(titre) {
-  return titre.toLowerCase().replace(/^(le |la |les |un |une |the )/i, "").trim();
+  return titre
+    .toLowerCase()
+    .replace(/^(l['’]|le |la |les |un |une |the )/i, "")
+    .trim();
 }
 
 // ===== JEU =====
@@ -220,3 +223,4 @@ document.getElementById("filmInput").addEventListener("keydown", e => {
 
 </body>
 </html>
+
