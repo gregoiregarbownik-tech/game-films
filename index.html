@@ -56,7 +56,7 @@ input,select,button{padding:8px;margin:5px;border-radius:4px;border:none;}
 </div>
 
 <br>
-<button onclick="startGame()">▶️ Démarrer</button>
+<button id="startBtn">▶️ Démarrer</button>
 
 <hr>
 
@@ -66,20 +66,33 @@ input,select,button{padding:8px;margin:5px;border-radius:4px;border:none;}
   <div id="activeLetter"></div>
 
   <input id="inputFilm" placeholder="Titre du film">
-  <button onclick="validerFilm()">Valider</button>
+  <button id="validateBtn">Valider</button>
 
   <h3 id="scores"></h3>
   <div id="films"></div>
 </div>
 
 <script>
+window.addEventListener("DOMContentLoaded", () => {
 const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
 let joueurs=[], scores=[], joueurActuel=0;
 let filmsJoues=[];
 let timerInt,timeLeft;
 let selectedLetter="", selectedGenre="", modeLettreAleatoire=false;
-let activeLetterDiv;
+let activeLetterDiv = document.getElementById("activeLetter");
 const determinants=["le","la","les","l","un","une","des","the","a","an"];
+
+const mode = document.getElementById("mode");
+const letter = document.getElementById("letter");
+const genre = document.getElementById("genre");
+const multiConfig = document.getElementById("multiConfig");
+const nbJoueurs = document.getElementById("nbJoueurs");
+const pseudos = document.getElementById("pseudos");
+const filmsDiv = document.getElementById("films");
+const turn = document.getElementById("turn");
+const timer = document.getElementById("timer");
+const scoresDiv = document.getElementById("scores");
+const inputFilm = document.getElementById("inputFilm");
 
 /* UTILS */
 function normalize(t){return t.toLowerCase().replace(/['’]/g,"").replace(/[^a-z0-9]/g,"").trim();}
@@ -101,10 +114,35 @@ function onModeChange(){multiConfig.style.display = mode.value==="multi"?"block"
 function updatePseudos(){pseudos.innerHTML="";for(let i=0;i<nbJoueurs.value;i++){pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;}}
 updatePseudos();
 
-/* START */
+/* PICK RANDOM LETTER */
+function pickRandomLetter(){
+  selectedLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+  if(activeLetterDiv) activeLetterDiv.textContent = "Lettre actuelle : " + selectedLetter;
+}
+
+/* TIMER */
+function startTimer(){
+  clearInterval(timerInt);
+  timeLeft=parseInt(document.getElementById("time").value)*60;
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    timer.textContent="⏱️ "+timeLeft+"s";
+    if(timeLeft<=0){
+      clearInterval(timerInt);
+      alert("Fin de la partie\n"+joueurs.map((j,i)=>`${j}: ${scores[i]}`).join("\n"));
+    }
+  },1000);
+}
+
+/* UPDATE UI */
+function updateUI(){
+  turn.innerHTML="Tour de : <span class='joueurActif'>"+joueurs[joueurActuel]+"</span>";
+  scoresDiv.textContent = joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
+}
+
+/* START GAME */
 function startGame(){
-  activeLetterDiv = document.getElementById("activeLetter"); // initialisation après DOM
-  filmsJoues=[]; joueurs=[]; scores=[]; joueurActuel=0; films.innerHTML="";
+  filmsJoues=[]; joueurs=[]; scores=[]; joueurActuel=0; filmsDiv.innerHTML="";
   selectedLetter=letter.value;
   modeLettreAleatoire=(letter.value==="random");
   selectedGenre=genre.value;
@@ -115,32 +153,10 @@ function startGame(){
   if(modeLettreAleatoire) pickRandomLetter();
   updateUI();
   startTimer();
+  document.getElementById("game").style.display="block";
 }
 
-/* PICK RANDOM LETTER */
-function pickRandomLetter(){
-  selectedLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  if(activeLetterDiv) activeLetterDiv.textContent = "Lettre actuelle : " + selectedLetter;
-}
-
-/* TIMER */
-function startTimer(){
-  clearInterval(timerInt);
-  timeLeft=parseInt(time.value)*60;
-  timerInt=setInterval(()=>{
-    timeLeft--;
-    timer.textContent="⏱️ "+timeLeft+"s";
-    if(timeLeft<=0){clearInterval(timerInt);alert("Fin de la partie\n"+joueurs.map((j,i)=>`${j}: ${scores[i]}`).join("\n"));}
-  },1000);
-}
-
-/* UPDATE UI */
-function updateUI(){
-  turn.innerHTML="Tour de : <span class='joueurActif'>"+joueurs[joueurActuel]+"</span>";
-  scores.textContent = joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
-}
-
-/* VALIDATION */
+/* VALIDATION FILM */
 async function validerFilm(){
   let input=inputFilm.value.trim(); if(!input) return;
   let clean=normalize(stripDeterminant(input));
@@ -178,7 +194,7 @@ async function validerFilm(){
   card.className="film-card new";
   const imgUrl=film.poster_path?`https://image.tmdb.org/t/p/w200${film.poster_path}`:"";
   card.innerHTML=`${imgUrl?`<img src="${imgUrl}">`:''}<h4>${film.title}</h4>`;
-  films.prepend(card);
+  filmsDiv.prepend(card);
   setTimeout(()=>card.classList.remove("new"),300);
 
   inputFilm.value="";
@@ -188,6 +204,12 @@ async function validerFilm(){
   if(modeLettreAleatoire) pickRandomLetter(); // nouvelle lettre pour ce tour
   updateUI();
 }
+
+/* BIND BUTTONS */
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("validateBtn").addEventListener("click", validerFilm);
+
+});
 </script>
 
 </body>
