@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>🎬 Jeu des Films Multijoueur</title>
+<title>🎬 Jeu des Films Tour par Tour</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <style>
 body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg,#1a1a2e,#162447); color:#fff; text-align:center; margin:0; padding:20px;}
@@ -10,7 +10,8 @@ h1 { color:#ffcc00; }
 input, button, select { padding:10px; margin:5px; font-size:16px; border-radius:8px; border:none;}
 button { background:#ffcc00; font-weight:600; cursor:pointer;}
 button:hover { background:#e6b800;}
-#scoreBox, #bestScoreBox { display:inline-block; background:#222; padding:10px 20px; border-radius:10px; margin:10px;}
+#scoreBox { display:flex; justify-content:center; gap:15px; margin:10px;}
+.scoreJoueur { background:#222; padding:10px 20px; border-radius:10px;}
 #filmGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:15px; margin-top:20px;}
 .filmCard { background:#222; border-radius:10px; padding:5px;}
 .filmCard img { width:100px; height:150px; border-radius:6px;}
@@ -19,7 +20,7 @@ button:hover { background:#e6b800;}
 </head>
 <body>
 
-<h1>🎬 Jeu des Films</h1>
+<h1>🎬 Jeu des Films - Tour par Tour</h1>
 
 <div>
   Mode : 
@@ -37,7 +38,7 @@ button:hover { background:#e6b800;}
 <div id="joueursInput" style="display:none;"></div>
 
 <div>
-  ⏱ Durée (minutes) : <input type="number" id="timerInput" value="60" min="1" max="180">
+  ⏱ Durée (minutes) : <input type="number" id="timerInput" value="5" min="1" max="180">
   🔤 Mode lettre : 
   <select id="lettreInput">
     <option value="">Tous les films</option>
@@ -51,8 +52,7 @@ button:hover { background:#e6b800;}
 </div>
 
 <div id="joueurActif"></div>
-<div id="scoreBox">Score : <span id="score">0</span></div>
-<div id="bestScoreBox">Meilleur score : <span id="bestScore">0</span></div>
+<div id="scoreBox"></div>
 
 <p>⏳ Temps restant : <span id="temps">--:--:--</span></p>
 <button onclick="pauseTimer()">⏸ Pause</button>
@@ -72,20 +72,16 @@ for(let i=65;i<=90;i++){
 }
 
 // ===== VARIABLES =====
-let score = 0;
-let bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
-let filmsTrouves = [];
 let temps = 0;
 let timer = null;
+let filmsTrouves = [];
 let joueurs = [];
 let joueurActuel = 0;
-document.getElementById("bestScore").textContent = bestScore;
 
-// ===== CLÉS API =====
 const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
 const omdbKey="10a96ebb";
 
-// ===== UTILS =====
+// ===== UTIL =====
 function normaliser(txt){ return txt.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
 function titreSansDeterminant(titre){ return titre.toLowerCase().replace(/^(l['’]|le |la |les |un |une |the )/i,"").trim();}
 
@@ -103,7 +99,6 @@ function configurerJoueurs(){
   const nb = parseInt(document.getElementById("nbJoueurs").value);
   const div = document.getElementById("joueursInput");
   div.innerHTML="";
-  joueurs=[];
   for(let i=0;i<nb;i++){
     const input=document.createElement("input");
     input.placeholder="Nom joueur "+(i+1);
@@ -120,33 +115,52 @@ function configurerJoueurs(){
       joueurs.push({nom:nom,score:0});
     }
     div.style.display="none";
+    majScoreJoueurs();
     alert("Prêt ! Tour de "+joueurs[0].nom);
   }
   div.appendChild(btn);
   div.style.display="block";
 }
 
+function majScoreJoueurs(){
+  const box=document.getElementById("scoreBox");
+  box.innerHTML="";
+  joueurs.forEach((j,i)=>{
+    const div=document.createElement("div");
+    div.className="scoreJoueur";
+    div.id="scoreJ"+i;
+    div.textContent=`${j.nom} : ${j.score}`;
+    box.appendChild(div);
+  });
+}
+
+function majJoueurActif(){
+  if(document.getElementById("modeJeu").value=="multi")
+    document.getElementById("joueurActif").textContent="🎮 Joueur actuel : "+joueurs[joueurActuel].nom;
+  else
+    document.getElementById("joueurActif").textContent="";
+}
+
 // ===== JEU =====
 function demarrerJeu(){
-  score=0;
   filmsTrouves=[];
-  temps=document.getElementById("timerInput").value*60;
-  document.getElementById("score").textContent=score;
-  document.getElementById("filmGrid").innerHTML="";
+  joueurActuel=0;
+  const duree = parseInt(document.getElementById("timerInput").value);
+  temps=duree*60;
   document.getElementById("filmInput").disabled=false;
   document.querySelector("button[onclick='validerFilm()']").disabled=false;
-  joueurActuel=0;
+  majJoueurActif();
+  majScoreJoueurs();
+  document.getElementById("filmGrid").innerHTML="";
   if(timer) clearInterval(timer);
   timer=setInterval(updateTimer,1000);
   updateTimer();
-  majJoueurActif();
 }
 
 function updateTimer(){
   if(temps<=0){
     clearInterval(timer);
-    if(document.getElementById("modeJeu").value=="multi") finDuTour();
-    else alert("⏰ Temps écoulé ! Score : "+score);
+    finPartie();
     return;
   }
   let h=Math.floor(temps/3600);
@@ -158,31 +172,11 @@ function updateTimer(){
 
 function pauseTimer(){ if(timer) clearInterval(timer); timer=null;}
 function reprendreTimer(){ if(!timer && temps>0) timer=setInterval(updateTimer,1000);}
-function majJoueurActif(){ 
-  if(document.getElementById("modeJeu").value=="multi") 
-    document.getElementById("joueurActif").textContent="🎮 Joueur actuel : "+joueurs[joueurActuel].nom;
-  else document.getElementById("joueurActif").textContent="";
-}
 
-// ===== FIN TOUR MULTI =====
-function finDuTour(){
-  joueurs[joueurActuel].score=score;
-  joueurActuel++;
-  if(joueurActuel<joueurs.length){
-    alert("Tour suivant : "+joueurs[joueurActuel].nom);
-    demarrerJeu();
-  }else{
-    afficherResultats();
-  }
-}
-
-// ===== AFFICHER RESULTATS =====
-function afficherResultats(){
-  joueurs.sort((a,b)=>b.score-a.score);
-  let msg="🏆 Résultats :\n";
-  joueurs.forEach(j=>{msg+=j.nom+" : "+j.score+" films\n";});
-  msg+="\n🎉 Gagnant : "+joueurs[0].nom+" avec "+joueurs[0].score+" films !";
-  alert(msg);
+// ===== FIN PARTIE =====
+function finPartie(){
+  let gagnant = joueurs.reduce((a,b)=>a.score>=b.score?a:b);
+  alert(`⏰ Temps écoulé ! Gagnant : ${gagnant.nom} avec ${gagnant.score} films`);
 }
 
 // ===== VALIDER FILM =====
@@ -192,6 +186,7 @@ async function validerFilm(){
   if(!titre) return;
   const titreNorm=normaliser(titreSansDeterminant(titre));
   if(filmsTrouves.includes(titreNorm)){ alert("Film déjà trouvé !"); return; }
+
   const lettre=document.getElementById("lettreInput").value;
 
   const res=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titre)}&language=fr-FR`);
@@ -212,9 +207,8 @@ async function validerFilm(){
   if(lettre && !titreNettoye.startsWith(lettre)){ alert("❌ Mauvaise lettre"); return; }
 
   filmsTrouves.push(titreNorm);
-  score++;
-  document.getElementById("score").textContent=score;
-  if(score>bestScore){ bestScore=score; localStorage.setItem("bestScore",bestScore); document.getElementById("bestScore").textContent=bestScore; }
+  joueurs[joueurActuel].score++;
+  document.getElementById("scoreJ"+joueurActuel).textContent=`${joueurs[joueurActuel].nom} : ${joueurs[joueurActuel].score}`;
 
   const card=document.createElement("div"); card.className="filmCard";
   const img=document.createElement("img");
@@ -222,11 +216,14 @@ async function validerFilm(){
   card.appendChild(img);
   const titleDiv=document.createElement("div"); titleDiv.textContent=film.title; card.appendChild(titleDiv);
   document.getElementById("filmGrid").prepend(card);
+
   input.value="";
+  joueurActuel = (joueurActuel + 1) % joueurs.length;
+  majJoueurActif();
 }
 
 document.getElementById("filmInput").addEventListener("keydown",e=>{ if(e.key==="Enter") validerFilm(); });
-</script>
 
+</script>
 </body>
 </html>
