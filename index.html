@@ -163,7 +163,7 @@ async function validerFilm() {
   const titre = input.value.trim();
   if (!titre) return;
 
-  const titreNorm = normaliser(titre);
+  const titreNorm = normaliser(titreSansDeterminant(titre));
   if (filmsTrouves.includes(titreNorm)) {
     alert("Film déjà trouvé !");
     return;
@@ -237,3 +237,4 @@ document.getElementById("filmInput").addEventListener("keydown", e => {
 
 </body>
 </html>
+
