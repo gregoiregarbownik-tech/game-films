@@ -78,8 +78,8 @@ let joueurs=[], scores=[], joueurActuel=0;
 let filmsJoues=[];
 let timerInt,timeLeft;
 let selectedLetter="", selectedGenre="", modeLettreAleatoire=false;
+let activeLetterDiv;
 const determinants=["le","la","les","l","un","une","des","the","a","an"];
-const activeLetterDiv = document.getElementById("activeLetter");
 
 /* UTILS */
 function normalize(t){return t.toLowerCase().replace(/['’]/g,"").replace(/[^a-z0-9]/g,"").trim();}
@@ -103,6 +103,7 @@ updatePseudos();
 
 /* START */
 function startGame(){
+  activeLetterDiv = document.getElementById("activeLetter"); // initialisation après DOM
   filmsJoues=[]; joueurs=[]; scores=[]; joueurActuel=0; films.innerHTML="";
   selectedLetter=letter.value;
   modeLettreAleatoire=(letter.value==="random");
@@ -119,7 +120,7 @@ function startGame(){
 /* PICK RANDOM LETTER */
 function pickRandomLetter(){
   selectedLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-  activeLetterDiv.textContent = "Lettre actuelle : " + selectedLetter;
+  if(activeLetterDiv) activeLetterDiv.textContent = "Lettre actuelle : " + selectedLetter;
 }
 
 /* TIMER */
