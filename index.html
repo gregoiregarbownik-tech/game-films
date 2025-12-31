@@ -2,56 +2,12 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>🎬 Jeu des Films</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-
+<title>Jeu des Films</title>
 <style>
-body {
-  font-family: Poppins, sans-serif;
-  background: #0f172a;
-  color: white;
-  text-align: center;
-  padding: 20px;
-}
-h1 { color: #facc15; }
-input, button, select {
-  padding: 10px;
-  margin: 5px;
-  border-radius: 8px;
-  border: none;
-}
-button {
-  background: #facc15;
-  font-weight: bold;
-  cursor: pointer;
-}
-#scoreBox {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-}
-.score {
-  background: #1e293b;
-  padding: 10px 20px;
-  border-radius: 10px;
-}
-#filmGrid {
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 120px);
-  justify-content: center;
-  gap: 15px;
-}
-.card {
-  background: #1e293b;
-  border-radius: 10px;
-  padding: 5px;
-}
-.card img {
-  width: 100px;
-  height: 150px;
-  border-radius: 6px;
-}
+body { font-family: Arial; background:#111; color:white; text-align:center }
+input, select, button { padding:8px; margin:5px }
+#films { max-height:200px; overflow:auto; border:1px solid #555; padding:5px }
+.joueur { font-weight:bold }
 </style>
 </head>
 
@@ -59,203 +15,200 @@ button {
 
 <h1>🎬 Jeu des Films</h1>
 
-<div>
-Mode :
-<select id="mode">
+<!-- CONFIG -->
+<label>Mode :</label>
+<select id="mode" onchange="onModeChange()">
   <option value="solo">Solo</option>
   <option value="multi">Multijoueur</option>
 </select>
-</div>
 
-<div>
-⏱ Temps (minutes) :
-<input type="number" id="timerInput" value="5" min="1">
+<br>
 
-🔤 Lettre :
-<select id="lettreInput">
+<label>Temps (minutes) :</label>
+<input type="number" id="time" value="10" min="1">
+
+<br>
+
+<label>Lettre :</label>
+<select id="letter">
   <option value="">Toutes</option>
-  <option value="random">Aléatoire</option>
 </select>
 
-🎭 Genre :
-<select id="genreInput">
+<br>
+
+<label>Genre :</label>
+<select id="genre">
   <option value="">Tous</option>
   <option value="16">Animation</option>
-  <option value="28">Action</option>
-  <option value="35">Comédie</option>
-  <option value="18">Drame</option>
 </select>
 
-<button onclick="demarrer()">Démarrer</button>
+<!-- MULTI CONFIG -->
+<div id="multiConfig" style="display:none;">
+  <h3>Multijoueur</h3>
+  <label>Joueurs :</label>
+  <select id="nbJoueurs" onchange="updatePseudos()">
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+  </select>
+  <div id="pseudos"></div>
 </div>
 
-<div>
-<input id="filmInput" placeholder="Titre du film" disabled>
-<button onclick="valider()" disabled>Valider</button>
+<br>
+<button onclick="startGame()">▶️ Démarrer</button>
+
+<hr>
+
+<!-- JEU -->
+<div id="game" style="display:none;">
+  <h2 id="turn"></h2>
+  <h3 id="timer"></h3>
+
+  <input id="inputFilm" placeholder="Titre du film">
+  <button onclick="validerFilm()">Valider</button>
+
+  <h3 id="scores"></h3>
+
+  <div id="films"></div>
 </div>
-
-<p id="lettreAff"></p>
-<p id="timer">⏳ --:--</p>
-
-<div id="scoreBox"></div>
-<div id="filmGrid"></div>
 
 <script>
 const tmdbKey = "00f966a09a2db9feeb0ceedc1c33e89d";
+let joueurs=[], scores=[], joueurActuel=0;
+let filmsJoues=[], timerInt, timeLeft;
+let selectedLetter="", selectedGenre="";
 
-let joueurs = [];
-let joueurActuel = 0;
-let films = [];
-let lettreActuelle = "";
-let temps = 0;
-let interval = null;
+const determinants = ["le","la","les","l","un","une","des","the","a","an"];
 
-const filmInput = document.getElementById("filmInput");
-const validerBtn = document.querySelector("button[onclick='valider()']");
+function normalize(t){
+  return t.toLowerCase()
+   .replace(/['’]/g,"")
+   .replace(/[^a-z0-9]/g,"")
+   .trim();
+}
 
-// alphabet
-const selectLettre = document.getElementById("lettreInput");
+function stripDeterminant(t){
+  let w = t.toLowerCase().trim();
+  for(let d of determinants){
+    if(w.startsWith(d+" ")) return w.slice(d.length+1);
+    if(w.startsWith(d+"'")) return w.slice(d.length+1);
+  }
+  return w;
+}
+
+/* INIT */
 for(let i=65;i<=90;i++){
-  const l = String.fromCharCode(i);
-  let o = document.createElement("option");
-  o.value = l.toLowerCase();
-  o.textContent = l;
-  selectLettre.appendChild(o);
+  let o=document.createElement("option");
+  o.value=o.textContent=String.fromCharCode(i);
+  letter.appendChild(o);
 }
 
-function normaliser(t){
-  return t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-    .toLowerCase()
-    .replace(/^(l['’]|le |la |les |un |une |the )/,"")
-    .trim();
+function onModeChange(){
+  multiConfig.style.display = mode.value==="multi"?"block":"none";
 }
 
-function lettreRandom(){
-  return "abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random()*26)];
+function updatePseudos(){
+  pseudos.innerHTML="";
+  let n=nbJoueurs.value;
+  for(let i=0;i<n;i++){
+    pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;
+  }
 }
 
-function demarrer(){
-  films = [];
-  joueurActuel = 0;
-  document.getElementById("filmGrid").innerHTML = "";
-  document.getElementById("scoreBox").innerHTML = "";
+updatePseudos();
 
-  joueurs = document.getElementById("mode").value === "multi"
-    ? [{nom:"Joueur 1",score:0},{nom:"Joueur 2",score:0}]
-    : [{nom:"Joueur",score:0}];
+/* START */
+function startGame(){
+  filmsJoues=[];
+  joueurs=[];
+  scores=[];
+  joueurActuel=0;
 
-  joueurs.forEach(j=>{
-    const d=document.createElement("div");
-    d.className="score";
-    d.id=j.nom;
-    d.textContent=`${j.nom}: 0`;
-    document.getElementById("scoreBox").appendChild(d);
+  selectedLetter=letter.value;
+  selectedGenre=genre.value;
+
+  if(mode.value==="multi"){
+    let n=nbJoueurs.value;
+    for(let i=0;i<n;i++){
+      joueurs.push(document.getElementById("p"+i).value||`Joueur ${i+1}`);
+      scores.push(0);
+    }
+  } else {
+    joueurs=["Joueur"];
+    scores=[0];
+  }
+
+  timeLeft=parseInt(time.value)*60;
+  game.style.display="block";
+  updateUI();
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(timerInt);
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    timer.textContent="⏱️ "+timeLeft+"s";
+    if(timeLeft<=0){
+      clearInterval(timerInt);
+      alert("Fin !\n"+joueurs.map((j,i)=>`${j}: ${scores[i]}`).join("\n"));
+    }
+  },1000);
+}
+
+function updateUI(){
+  turn.textContent="Tour de : "+joueurs[joueurActuel];
+  scoresDiv=scores.map((s,i)=>`${joueurs[i]} : ${s}`).join(" | ");
+  scoresEl=document.getElementById("scores");
+  scoresEl.textContent=scoresDiv;
+}
+
+/* VALIDATION */
+async function validerFilm(){
+  let input=inputFilm.value.trim();
+  if(!input) return;
+
+  let clean=normalize(stripDeterminant(input));
+  if(filmsJoues.includes(clean)){
+    alert("Déjà utilisé !");
+    return;
+  }
+
+  let res=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`);
+  let data=await res.json();
+
+  let film=data.results?.find(f=>{
+    let t1=normalize(stripDeterminant(f.title||""));
+    let t2=normalize(stripDeterminant(f.original_title||""));
+    return clean===t1||clean===t2;
   });
 
-  filmInput.disabled=false;
-  validerBtn.disabled=false;
+  if(!film){ alert("Film introuvable"); return; }
 
-  temps = document.getElementById("timerInput").value * 60;
-  clearInterval(interval);
-  interval=setInterval(updateTimer,1000);
-  updateTimer();
-
-  if(selectLettre.value==="random"){
-    lettreActuelle = lettreRandom();
-  } else {
-    lettreActuelle = selectLettre.value;
-  }
-  afficherLettre();
-}
-
-function afficherLettre(){
-  document.getElementById("lettreAff").textContent =
-    lettreActuelle ? "Lettre : " + lettreActuelle.toUpperCase() : "";
-}
-
-function updateTimer(){
-  if(temps<=0){
-    clearInterval(interval);
-    fin();
-    return;
-  }
-  let m=Math.floor(temps/60), s=temps%60;
-  document.getElementById("timer").textContent =
-    `⏳ ${m}:${s.toString().padStart(2,"0")}`;
-  temps--;
-}
-
-async function valider(){
-  const titreUser = filmInput.value.trim();
-  if(!titreUser) return;
-
-  const normUser = normaliser(titreUser);
-  if(films.includes(normUser)){
-    alert("Déjà trouvé");
-    return;
-  }
-
-  const search = await fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(titreUser)}`
-  );
-  const data = await search.json();
-
-  let film = data.results?.find(f =>
-    normaliser(f.title)===normUser ||
-    normaliser(f.original_title)===normUser
-  );
-
-  if(!film){
-    alert("Titre exact requis");
-    return;
-  }
-
-  // 🔥 VÉRIFICATION GENRE CORRIGÉE
-  const genreChoisi = document.getElementById("genreInput").value;
-  if(genreChoisi){
-    const details = await fetch(
-      `https://api.themoviedb.org/3/movie/${film.id}?api_key=${tmdbKey}`
-    ).then(r=>r.json());
-
-    const genres = details.genres.map(g=>g.id);
-    if(!genres.includes(parseInt(genreChoisi))){
+  /* GENRE SAFE CHECK */
+  if(selectedGenre){
+    let d=await fetch(`https://api.themoviedb.org/3/movie/${film.id}?api_key=${tmdbKey}&language=fr-FR`);
+    let det=await d.json();
+    let gids=det.genres.map(g=>g.id);
+    if(!gids.includes(parseInt(selectedGenre))){
       alert("Mauvais genre");
       return;
     }
   }
 
-  // lettre
-  if(lettreActuelle && !normUser.startsWith(lettreActuelle)){
+  let base=stripDeterminant(film.title||film.original_title);
+  if(selectedLetter && base[0].toUpperCase()!==selectedLetter){
     alert("Mauvaise lettre");
     return;
   }
 
-  films.push(normUser);
+  filmsJoues.push(clean);
+  scores[joueurActuel]++;
+  joueurActuel=(joueurActuel+1)%joueurs.length;
 
-  joueurs[joueurActuel].score++;
-  document.getElementById(joueurs[joueurActuel].nom).textContent =
-    `${joueurs[joueurActuel].nom}: ${joueurs[joueurActuel].score}`;
-
-  const card=document.createElement("div");
-  card.className="card";
-  card.innerHTML=`
-    <img src="https://image.tmdb.org/t/p/w200${film.poster_path}">
-    <div>${film.title}</div>`;
-  document.getElementById("filmGrid").prepend(card);
-
-  filmInput.value="";
-
-  joueurActuel = (joueurActuel+1)%joueurs.length;
-
-  if(selectLettre.value==="random"){
-    lettreActuelle = lettreRandom();
-    afficherLettre();
-  }
-}
-
-function fin(){
-  const gagnant = joueurs.reduce((a,b)=>a.score>b.score?a:b);
-  alert("Gagnant : "+gagnant.nom+" ("+gagnant.score+")");
+  films.innerHTML=`<div>${film.title}</div>`+films.innerHTML;
+  inputFilm.value="";
+  updateUI();
 }
 </script>
 
