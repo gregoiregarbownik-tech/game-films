@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>🎬 Jeu des Films GOLD + Lettre Aléatoire</title>
+<title>🎬 Jeu des Films GOLD</title>
 <style>
 body{font-family:Arial;background:#111;color:white;text-align:center;margin:0;padding:0;}
 input,select,button{padding:8px;margin:5px;border-radius:4px;border:none;}
@@ -79,6 +79,7 @@ let filmsJoues=[];
 let timerInt,timeLeft;
 let selectedLetter="", selectedGenre="", modeLettreAleatoire=false;
 const determinants=["le","la","les","l","un","une","des","the","a","an"];
+const activeLetterDiv = document.getElementById("activeLetter");
 
 /* UTILS */
 function normalize(t){return t.toLowerCase().replace(/['’]/g,"").replace(/[^a-z0-9]/g,"").trim();}
@@ -117,8 +118,8 @@ function startGame(){
 
 /* PICK RANDOM LETTER */
 function pickRandomLetter(){
-  selectedLetter=String.fromCharCode(65+Math.floor(Math.random()*26));
-  activeLetter.textContent="Lettre actuelle : "+selectedLetter;
+  selectedLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+  activeLetterDiv.textContent = "Lettre actuelle : " + selectedLetter;
 }
 
 /* TIMER */
@@ -136,7 +137,6 @@ function startTimer(){
 function updateUI(){
   turn.innerHTML="Tour de : <span class='joueurActif'>"+joueurs[joueurActuel]+"</span>";
   scores.textContent = joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
-  if(modeLettreAleatoire) pickRandomLetter();
 }
 
 /* VALIDATION */
@@ -181,7 +181,10 @@ async function validerFilm(){
   setTimeout(()=>card.classList.remove("new"),300);
 
   inputFilm.value="";
-  joueurActuel=(joueurActuel+1)%joueurs.length;
+
+  // Passage au joueur suivant
+  joueurActuel = (joueurActuel + 1) % joueurs.length;
+  if(modeLettreAleatoire) pickRandomLetter(); // nouvelle lettre pour ce tour
   updateUI();
 }
 </script>
