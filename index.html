@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>🎬 Jeu des Films</title>
+<title>🎬 Jeu des Films GOLD</title>
 <style>
 body{font-family:Arial;background:#111;color:white;text-align:center;margin:0;padding:0;}
 input,select,button{padding:8px;margin:5px;border-radius:4px;border:none;}
@@ -73,7 +73,6 @@ input,select,button{padding:8px;margin:5px;border-radius:4px;border:none;}
 
 <script>
 window.addEventListener("DOMContentLoaded", ()=>{
-
 const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
 const determinants=["le","la","les","l","un","une","des","the","a","an"];
 
@@ -97,11 +96,27 @@ const startBtn = document.getElementById("startBtn");
 const validateBtn = document.getElementById("validateBtn");
 
 /* Utils */
-function normalize(t){return t.toLowerCase().replace(/['’]/g,"").replace(/[^a-z0-9]/g,"").trim();}
-function stripDeterminant(t){let w=t.toLowerCase().trim();for(let d of determinants){if(w.startsWith(d+" ")) return w.slice(d.length+1); if(w.startsWith(d+"'")) return w.slice(d.length+1);} return w;}
+function normalize(t){
+    return t.toLowerCase()
+            .normalize("NFD")                // sépare lettres et accents
+            .replace(/[\u0300-\u036f]/g,"") // supprime accents
+            .replace(/['’]/g,"")
+            .replace(/[^a-z0-9]/g,"")
+            .trim();
+}
+function stripDeterminant(t){
+    let w=t.toLowerCase().trim();
+    for(let d of determinants){
+        if(w.startsWith(d+" ")) return w.slice(d.length+1);
+        if(w.startsWith(d+"'")) return w.slice(d.length+1);
+    }
+    return w;
+}
 
 /* Init letters */
-for(let i=65;i<=90;i++){let o=document.createElement("option"); o.value=o.textContent=String.fromCharCode(i); letter.appendChild(o);}
+for(let i=65;i<=90;i++){
+    let o=document.createElement("option"); o.value=o.textContent=String.fromCharCode(i); letter.appendChild(o);
+}
 
 /* Load genres */
 async function chargerGenres(){
@@ -174,8 +189,9 @@ function startGame(){
 /* Validate film */
 async function validerFilm(){
   let input = inputFilm.value.trim(); if(!input) return;
-  let clean = normalize(stripDeterminant(input));
-  if(filmsJoues.includes(clean)){alert("Déjà utilisé !"); return;}
+
+  // on génère un tableau de titres normalisés pour ce film
+  const cleanInput = normalize(stripDeterminant(input));
 
   const resFR = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`);
   const dataFR = await resFR.json();
@@ -185,9 +201,16 @@ async function validerFilm(){
   let film = [...dataFR.results, ...dataEN.results]?.find(f=>{
     let t1=normalize(stripDeterminant(f.title||""));
     let t2=normalize(stripDeterminant(f.original_title||""));
-    return clean===t1||clean===t2;
+    return cleanInput===t1||cleanInput===t2;
   });
   if(!film){alert("Film introuvable"); return;}
+
+  // tous les titres du film normalisés pour vérifier les doublons
+  let allTitles = [film.title, film.original_title].map(t => normalize(stripDeterminant(t)));
+  if(filmsJoues.some(f => allTitles.includes(f))){
+      alert("Déjà utilisé !");
+      return;
+  }
 
   /* Genre check */
   if(selectedGenre){
@@ -201,7 +224,7 @@ async function validerFilm(){
   if(selectedLetter && base[0].toUpperCase()!==selectedLetter){alert("Mauvaise lettre"); return;}
 
   /* Add film */
-  filmsJoues.push(clean);
+  filmsJoues.push(...allTitles); // tous les titres pour éviter doublons
   scores[joueurActuel]++;
   const card = document.createElement("div");
   card.className="film-card new";
@@ -225,4 +248,3 @@ validateBtn.addEventListener("click", validerFilm);
 
 </body>
 </html>
-
