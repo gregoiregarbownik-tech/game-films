@@ -168,7 +168,8 @@ function updateUI(){
 
 /* Start game */
 function startGame(){
-  filmsJoues=[]; joueurs=[]; scores=[]; joueurActuel=0; filmsDiv.innerHTML="";
+  filmsJoues=[]; // <-- réinitialisation des films pour une nouvelle partie
+  joueurs=[]; scores=[]; joueurActuel=0; filmsDiv.innerHTML="";
   selectedLetter = letter.value;
   modeLettreAleatoire = (letter.value==="random");
   selectedGenre = genre.value;
@@ -190,7 +191,6 @@ function startGame(){
 async function validerFilm(){
   let input = inputFilm.value.trim(); if(!input) return;
 
-  // on génère un tableau de titres normalisés pour ce film
   const cleanInput = normalize(stripDeterminant(input));
 
   const resFR = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`);
@@ -205,7 +205,6 @@ async function validerFilm(){
   });
   if(!film){alert("Film introuvable"); return;}
 
-  // tous les titres du film normalisés pour vérifier les doublons
   let allTitles = [film.title, film.original_title].map(t => normalize(stripDeterminant(t)));
   if(filmsJoues.some(f => allTitles.includes(f))){
       alert("Déjà utilisé !");
@@ -224,7 +223,7 @@ async function validerFilm(){
   if(selectedLetter && base[0].toUpperCase()!==selectedLetter){alert("Mauvaise lettre"); return;}
 
   /* Add film */
-  filmsJoues.push(...allTitles); // tous les titres pour éviter doublons
+  filmsJoues.push(...allTitles);
   scores[joueurActuel]++;
   const card = document.createElement("div");
   card.className="film-card new";
