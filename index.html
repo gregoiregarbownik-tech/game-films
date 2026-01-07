@@ -4,46 +4,13 @@
 <meta charset="UTF-8">
 <title>🎬 Jeu des Films</title>
 <style>
-body{
-  font-family:Arial;
-  background:#111;
-  color:white;
-  text-align:center;
-  margin:0;
-}
-input,select,button{
-  padding:8px;
-  margin:5px;
-  border-radius:4px;
-  border:none;
-}
-#films{
-  max-height:350px;
-  overflow:auto;
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-}
-.film-card{
-  background:#222;
-  border:1px solid #555;
-  border-radius:8px;
-  width:120px;
-  margin:5px;
-  padding:5px;
-}
-.film-card img{
-  width:100%;
-  border-radius:4px;
-}
-.joueurActif{
-  color:#0f0;
-  font-weight:bold;
-}
-#activeLetter{
-  font-size:22px;
-  margin:10px;
-}
+body{font-family:Arial;background:#111;color:white;text-align:center;margin:0}
+input,select,button{padding:8px;margin:5px;border-radius:4px;border:none}
+#films{max-height:350px;overflow:auto;display:flex;flex-wrap:wrap;justify-content:center}
+.film-card{background:#222;border:1px solid #555;border-radius:8px;width:120px;margin:5px;padding:5px}
+.film-card img{width:100%;border-radius:4px}
+.joueurActif{color:#0f0;font-weight:bold}
+#activeLetter{font-size:22px;margin:10px}
 </style>
 </head>
 
@@ -100,110 +67,131 @@ const tmdbKey = "00f966a09a2db9feeb0ceedc1c33e89d";
 const determinants = ["le","la","les","l","un","une","des","the","a","an"];
 
 let joueurs=[], scores=[], joueurActuel=0;
-let filmsJoues = new Set();
+let filmsJoues = new Set(); // 🔐 ID TMDB uniquement
 let selectedLetter="", randomLetter=false;
 let timeLeft, timerInt;
 
-/* -------- Utils -------- */
+/* ---------- Utils ---------- */
 function normalize(t){
   return t.toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .replace(/['’]/g,"")
-    .replace(/[^a-z0-9]/g,"");
+    .replace(/[^a-z0-9]/g,"")
 }
+
 function stripDeterminant(t){
-  let s=t.toLowerCase().trim();
+  let s = t.toLowerCase().trim();
   for(let d of determinants){
     if(s.startsWith(d+" ")) return s.slice(d.length+1);
     if(s.startsWith(d+"'")) return s.slice(d.length+1);
   }
   return s;
 }
+
 function pickRandomLetter(){
-  selectedLetter=String.fromCharCode(65+Math.floor(Math.random()*26));
-  activeLetter.textContent="Lettre actuelle : "+selectedLetter;
+  selectedLetter = String.fromCharCode(65 + Math.floor(Math.random()*26));
+  document.getElementById("activeLetter").textContent =
+    "Lettre actuelle : " + selectedLetter;
 }
 
-/* -------- UI -------- */
-mode.onchange=()=>multiConfig.style.display=mode.value==="multi"?"block":"none";
-nbJoueurs.onchange=()=>{
+/* ---------- UI ---------- */
+const mode = document.getElementById("mode");
+const multiConfig = document.getElementById("multiConfig");
+const nbJoueurs = document.getElementById("nbJoueurs");
+const pseudos = document.getElementById("pseudos");
+
+mode.onchange = ()=> multiConfig.style.display =
+  mode.value==="multi" ? "block" : "none";
+
+nbJoueurs.onchange = ()=>{
   pseudos.innerHTML="";
   for(let i=0;i<nbJoueurs.value;i++){
-    pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;
+    pseudos.innerHTML += `<input id="p${i}" placeholder="Joueur ${i+1}">`;
   }
 };
 nbJoueurs.onchange();
 
-/* -------- Genres -------- */
+/* ---------- Genres ---------- */
 fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${tmdbKey}&language=fr-FR`)
-.then(r=>r.json())
-.then(d=>{
+.then(r=>r.json()).then(d=>{
   d.genres.forEach(g=>{
     let o=document.createElement("option");
-    o.value=g.id;
-    o.textContent=g.name;
+    o.value=g.id; o.textContent=g.name;
     genre.appendChild(o);
   });
 });
 
-/* -------- Timer -------- */
+/* ---------- Timer ---------- */
 function startTimer(){
   clearInterval(timerInt);
-  timeLeft=time.value*60;
-  timerInt=setInterval(()=>{
+  timeLeft = document.getElementById("time").value * 60;
+  timerInt = setInterval(()=>{
     timeLeft--;
-    timer.textContent="⏱️ "+timeLeft+"s";
+    timer.textContent = "⏱️ "+timeLeft+"s";
     if(timeLeft<=0){
       clearInterval(timerInt);
-      alert("Fin de partie\n"+
+      alert("Fin de partie\n" +
         joueurs.map((j,i)=>`${j} : ${scores[i]}`).join("\n"));
     }
   },1000);
 }
+
+/* ---------- Game ---------- */
 function updateUI(){
-  turn.innerHTML="Tour de <span class='joueurActif'>"+joueurs[joueurActuel]+"</span>";
-  scores.textContent=joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
+  turn.innerHTML = "Tour de <span class='joueurActif'>"+
+    joueurs[joueurActuel]+"</span>";
+  scores.textContent =
+    joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
 }
 
-/* -------- Start -------- */
-startBtn.onclick=()=>{
+document.getElementById("startBtn").onclick = ()=>{
   filmsJoues.clear();
-  joueurs=[];scores=[];joueurActuel=0;
+  joueurs=[]; scores=[]; joueurActuel=0;
   films.innerHTML="";
+
   if(mode.value==="multi"){
     for(let i=0;i<nbJoueurs.value;i++){
-      joueurs.push(document.getElementById("p"+i).value||`Joueur ${i+1}`);
+      joueurs.push(document.getElementById("p"+i).value || `Joueur ${i+1}`);
       scores.push(0);
     }
   } else { joueurs=["Joueur"]; scores=[0]; }
-  randomLetter=letter.value==="random";
-  if(randomLetter) pickRandomLetter(); else activeLetter.textContent="";
+
+  randomLetter = letter.value==="random";
+  if(randomLetter) pickRandomLetter();
+  else document.getElementById("activeLetter").textContent="";
+
   updateUI();
   startTimer();
   game.style.display="block";
-  inputFilm.focus();
 };
 
-/* -------- Validation -------- */
-validateBtn.onclick=async()=>{
-  let input=inputFilm.value.trim();
+document.getElementById("validateBtn").onclick = async ()=>{
+  let input = inputFilm.value.trim();
   if(!input) return;
 
-  const rFR=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`);
-  const rEN=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=en-US`);
-  const data=[...(await rFR.json()).results,...(await rEN.json()).results];
+  const resFR = await fetch(
+    `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=fr-FR`
+  );
+  const resEN = await fetch(
+    `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}&language=en-US`
+  );
 
-  const cleanInput=normalize(stripDeterminant(input));
-  const film=data.find(f=>{
-    return normalize(stripDeterminant(f.title||""))===cleanInput ||
-           normalize(stripDeterminant(f.original_title||""))===cleanInput;
+  const data = [...(await resFR.json()).results, ...(await resEN.json()).results];
+
+  const cleanInput = normalize(stripDeterminant(input));
+
+  const film = data.find(f=>{
+    const t1 = normalize(stripDeterminant(f.title||""));
+    const t2 = normalize(stripDeterminant(f.original_title||""));
+    return cleanInput===t1 || cleanInput===t2;
   });
-  if(!film){alert("Film introuvable");return;}
-  if(filmsJoues.has(film.id)){alert("Film déjà utilisé");return;}
 
-  let base=stripDeterminant(film.title||film.original_title);
+  if(!film){ alert("Film introuvable"); return; }
+  if(filmsJoues.has(film.id)){ alert("Film déjà utilisé"); return; }
+
+  let base = stripDeterminant(film.title || film.original_title);
   if(selectedLetter && base[0].toUpperCase()!==selectedLetter){
-    alert("Mauvaise lettre");return;
+    alert("Mauvaise lettre"); return;
   }
 
   filmsJoues.add(film.id);
@@ -211,26 +199,16 @@ validateBtn.onclick=async()=>{
 
   const card=document.createElement("div");
   card.className="film-card";
-  card.innerHTML=`
-    ${film.poster_path?`<img src="https://image.tmdb.org/t/p/w200${film.poster_path}">`:""}
+  card.innerHTML = `
+    ${film.poster_path?`<img src="https://image.tmdb.org/t/p/w200${film.poster_path}">`:``}
     <h4>${film.title}</h4>`;
   films.prepend(card);
 
   inputFilm.value="";
-  inputFilm.focus();
-
   joueurActuel=(joueurActuel+1)%joueurs.length;
   if(randomLetter) pickRandomLetter();
   updateUI();
 };
-
-/* -------- Entrée clavier -------- */
-inputFilm.addEventListener("keydown",e=>{
-  if(e.key==="Enter"){
-    e.preventDefault();
-    validateBtn.click();
-  }
-});
 </script>
 </body>
 </html>
