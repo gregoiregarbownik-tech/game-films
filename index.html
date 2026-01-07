@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>🎬 Jeu des Films</title>
+<title>🎬 Jeu des Films GOLD</title>
 <style>
 body{font-family:Arial;background:#111;color:white;text-align:center;margin:0}
 input,select,button{padding:8px;margin:5px;border-radius:5px;border:none}
@@ -25,6 +25,8 @@ input,select,button{padding:8px;margin:5px;border-radius:5px;border:none}
   <option value="multi">Multijoueur</option>
 </select>
 
+<label>Durée (minutes) :</label>
+<input type="number" id="duration" value="10" min="1">
 <select id="timerMode">
   <option value="timed">Temps limité</option>
   <option value="infinite">Temps infini</option>
@@ -34,6 +36,244 @@ input,select,button{padding:8px;margin:5px;border-radius:5px;border:none}
 <select id="letterMode">
   <option value="">Sans lettre</option>
   <option value="fixed">Fixe</option>
+  <option value="random">Aléatoire par tour</option>
+</select>
+<select id="letter"></select>
+
+<!-- Réalisateur facultatif -->
+<br>
+<input id="directorSearch" placeholder="Recherche réalisateur" autocomplete="off" style="width:200px">
+<div id="directorResults"></div>
+<p id="directorChosen"></p>
+
+<!-- Décennie facultative -->
+<br>
+<select id="decade">
+  <option value="">Toutes décennies</option>
+  <option value="1920">1920s</option>
+  <option value="1930">1930s</option>
+  <option value="1940">1940s</option>
+  <option value="1950">1950s</option>
+  <option value="1960">1960s</option>
+  <option value="1970">1970s</option>
+  <option value="1980">1980s</option>
+  <option value="1990">1990s</option>
+  <option value="2000">2000s</option>
+  <option value="2010">2010s</option>
+  <option value="2020">2020s</option>
+</select>
+
+<!-- Multijoueur -->
+<div id="multiConfig" style="display:none">
+  <select id="nbJoueurs">
+    <option>2</option><option>3</option><option>4</option>
+  </select>
+  <div id="pseudos"></div>
+</div>
+
+<br>
+<button id="startBtn">▶ Démarrer</button>
+
+<hr>
+
+<div id="game" style="display:none">
+  <h2 id="turn"></h2>
+  <h3 id="timer"></h3>
+  <h3 id="activeLetter"></h3>
+
+  <input id="inputFilm" placeholder="Titre du film" style="width:250px">
+  <button id="validateBtn">Valider</button>
+
+  <h3 id="scores"></h3>
+  <div id="films"></div>
+</div>
+
+<script>
+const tmdbKey="00f966a09a2db9feeb0ceedc1c33e89d";
+const determinants=["le","la","les","l","un","une","des","the","a","an"];
+
+let joueurs=[], scores=[], joueurActuel=0;
+let filmsJoues=new Set();
+let selectedLetter="", timerInt=null, timeLeft=0, modeLettreAleatoire=false;
+let selectedDirectorId=null, selectedDirectorName="";
+
+const mode=document.getElementById("mode");
+const timerMode=document.getElementById("timerMode");
+const duration=document.getElementById("duration");
+const letterMode=document.getElementById("letterMode");
+const letter=document.getElementById("letter");
+const multiConfig=document.getElementById("multiConfig");
+const nbJoueurs=document.getElementById("nbJoueurs");
+const pseudos=document.getElementById("pseudos");
+const directorSearch=document.getElementById("directorSearch");
+const directorResults=document.getElementById("directorResults");
+const directorChosen=document.getElementById("directorChosen");
+const decade=document.getElementById("decade");
+
+const game=document.getElementById("game");
+const turn=document.getElementById("turn");
+const timer=document.getElementById("timer");
+const activeLetter=document.getElementById("activeLetter");
+const scoresDiv=document.getElementById("scores");
+const filmsDiv=document.getElementById("films");
+const inputFilm=document.getElementById("inputFilm");
+
+/* Utils */
+function normalize(t){return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");}
+function stripDet(t){let w=t.toLowerCase().trim();for(let d of determinants){if(w.startsWith(d+" ")) return w.slice(d.length+1); if(w.startsWith(d+"'")) return w.slice(d.length+1);} return w;}
+
+/* Lettres */
+for(let i=65;i<=90;i++){let o=document.createElement("option"); o.value=o.textContent=String.fromCharCode(i); letter.appendChild(o);}
+
+/* Multijoueur */
+mode.onchange=()=>multiConfig.style.display=mode.value==="multi"?"block":"none";
+nbJoueurs.onchange=()=>{
+  pseudos.innerHTML="";
+  for(let i=0;i<nbJoueurs.value;i++)
+    pseudos.innerHTML+=`<input id="p${i}" placeholder="Joueur ${i+1}">`;
+};
+nbJoueurs.onchange();
+
+/* Lettre aléatoire */
+function pickLetter(){
+  selectedLetter=String.fromCharCode(65+Math.floor(Math.random()*26));
+  activeLetter.textContent=letterMode.value==="random"?"Lettre : "+selectedLetter:"";
+}
+
+/* Timer */
+function startTimer(){
+  clearInterval(timerInt);
+  if(timerMode.value==="infinite"){timer.textContent="⏱ Temps infini";return;}
+  timeLeft=parseInt(duration.value)*60;
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    timer.textContent="⏱ "+timeLeft+"s";
+    if(timeLeft<=0){clearInterval(timerInt);alert("Fin de partie\n"+joueurs.map((j,i)=>`${j}: ${scores[i]}`).join("\n"));}
+  },1000);
+}
+
+/* UI */
+function updateUI(){
+  turn.innerHTML="Tour de <span class='joueurActif'>"+joueurs[joueurActuel]+"</span>";
+  scoresDiv.textContent=joueurs.map((j,i)=>`${j}: ${scores[i]}`).join(" | ");
+}
+
+/* Start */
+document.getElementById("startBtn").onclick=()=>{
+  joueurs=[]; scores=[]; joueurActuel=0;
+  filmsJoues.clear();
+  filmsDiv.innerHTML="";
+  clearInterval(timerInt);
+  selectedDirectorId=null;
+  selectedDirectorName="";
+  directorChosen.textContent="";
+
+  if(mode.value==="multi"){
+    for(let i=0;i<nbJoueurs.value;i++){
+      joueurs.push(document.getElementById("p"+i).value||"Joueur "+(i+1));
+      scores.push(0);
+    }
+  } else {joueurs=["Joueur"]; scores=[0];}
+
+  modeLettreAleatoire=letterMode.value==="random";
+  selectedLetter=letter.value;
+  if(letterMode.value==="") selectedLetter="";
+  pickLetter();
+  game.style.display="block";
+  updateUI();
+  startTimer();
+};
+
+/* Autocomplete réalisateur */
+let directorTimeout=null;
+directorSearch.addEventListener("input",()=>{
+  const q=directorSearch.value.trim();
+  selectedDirectorId=null;
+  selectedDirectorName="";
+  directorChosen.textContent="";
+  if(q.length<2){directorResults.style.display="none"; return;}
+  clearTimeout(directorTimeout);
+  directorTimeout=setTimeout(async ()=>{
+    const res=await fetch(`https://api.themoviedb.org/3/search/person?api_key=${tmdbKey}&query=${encodeURIComponent(q)}`);
+    const data=await res.json();
+    directorResults.innerHTML="";
+    data.results.filter(p=>p.known_for_department==="Directing").slice(0,5).forEach(p=>{
+      const div=document.createElement("div");
+      div.textContent=p.name;
+      div.onclick=()=>{
+        selectedDirectorId=p.id;
+        selectedDirectorName=p.name;
+        directorChosen.textContent="🎬 Réalisateur : "+p.name;
+        directorResults.style.display="none";
+        directorSearch.value="";
+      };
+      directorResults.appendChild(div);
+    });
+    directorResults.style.display=directorResults.children.length?"block":"none";
+  },400);
+});
+
+/* Validation film */
+async function validerFilm(){
+  let input=inputFilm.value.trim();
+  if(!input) return;
+
+  const search=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(input)}`);
+  const data=await search.json();
+  if(!data.results.length){alert("Film introuvable");return;}
+
+  // Chercher film correspondant exactement au titre tapé FR/EN/original
+  let film=data.results.find(f=>{
+    const t1=normalize(stripDet(f.title||""));
+    const t2=normalize(stripDet(f.original_title||""));
+    const t3=normalize(stripDet(input));
+    return t1===t3 || t2===t3;
+  });
+  if(!film) film=data.results[0];
+
+  const key=film.id; // clé unique basée sur TMDB ID
+  if(filmsJoues.has(key)){alert("Film déjà utilisé");return;}
+
+  // Lettre
+  if(letterMode.value!="" && selectedLetter){
+    const base=stripDet(film.title||film.original_title);
+    if(base[0].toUpperCase()!==selectedLetter){alert("Mauvaise lettre"); return;}
+  }
+
+  // Décennie
+  if(decade.value){
+    const year=film.release_date?parseInt(film.release_date.split("-")[0]):0;
+    if(year<parseInt(decade.value)||year>=parseInt(decade.value)+10){alert("Hors décennie"); return;}
+  }
+
+  // Réalisateur
+  if(selectedDirectorId){
+    const c=await fetch(`https://api.themoviedb.org/3/movie/${film.id}/credits?api_key=${tmdbKey}`);
+    const credits=await c.json();
+    const ok=credits.crew.some(p=>p.job==="Director" && p.id===selectedDirectorId);
+    if(!ok){alert("Ce film n'est pas réalisé par "+selectedDirectorName);return;}
+  }
+
+  filmsJoues.add(key);
+  scores[joueurActuel]++;
+
+  const card=document.createElement("div");
+  card.className="film-card";
+  card.innerHTML=`${film.poster_path?`<img src="https://image.tmdb.org/t/p/w200${film.poster_path}">`:""}<h4>${film.title}</h4>`;
+  filmsDiv.prepend(card);
+
+  inputFilm.value="";
+  joueurActuel=(joueurActuel+1)%joueurs.length;
+  if(modeLettreAleatoire) pickLetter();
+  updateUI();
+}
+
+document.getElementById("validateBtn").onclick=validerFilm;
+inputFilm.addEventListener("keydown",e=>{if(e.key==="Enter") validerFilm();});
+
+</script>
+</body>
+</html>
   <option value="random">Aléatoire par tour</option>
 </select>
 <select id="letter"></select>
@@ -655,5 +895,6 @@ validateBtn.addEventListener("click", validerFilm);
 
 </body>
 </html>
+
 
 
