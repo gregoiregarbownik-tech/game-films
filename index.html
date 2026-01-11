@@ -24,7 +24,12 @@ input,select,button{padding:8px;margin:5px;border-radius:4px;border:none}
   <option value="multi">Multijoueur</option>
 </select><br>
 
-<label>Temps (minutes) :</label>
+<label>Temps :</label>
+<select id="timeMode">
+  <option value="limited">Temps limité</option>
+  <option value="infinite">Temps infini</option>
+</select>
+
 <input type="number" id="time" value="10" min="1"><br>
 
 <label>Mode lettre :</label>
@@ -67,7 +72,7 @@ const tmdbKey = "00f966a09a2db9feeb0ceedc1c33e89d";
 const determinants = ["le","la","les","l","un","une","des","the","a","an"];
 
 let joueurs=[], scores=[], joueurActuel=0;
-let filmsJoues = new Set(); // 🔐 ID TMDB uniquement
+let filmsJoues = new Set();
 let selectedLetter="", randomLetter=false;
 let timeLeft, timerInt;
 
@@ -76,7 +81,7 @@ function normalize(t){
   return t.toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .replace(/['’]/g,"")
-    .replace(/[^a-z0-9]/g,"")
+    .replace(/[^a-z0-9]/g,"");
 }
 
 function stripDeterminant(t){
@@ -90,16 +95,10 @@ function stripDeterminant(t){
 
 function pickRandomLetter(){
   selectedLetter = String.fromCharCode(65 + Math.floor(Math.random()*26));
-  document.getElementById("activeLetter").textContent =
-    "Lettre actuelle : " + selectedLetter;
+  activeLetter.textContent = "Lettre actuelle : " + selectedLetter;
 }
 
 /* ---------- UI ---------- */
-const mode = document.getElementById("mode");
-const multiConfig = document.getElementById("multiConfig");
-const nbJoueurs = document.getElementById("nbJoueurs");
-const pseudos = document.getElementById("pseudos");
-
 mode.onchange = ()=> multiConfig.style.display =
   mode.value==="multi" ? "block" : "none";
 
@@ -124,10 +123,19 @@ fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${tmdbKey}&language
 /* ---------- Timer ---------- */
 function startTimer(){
   clearInterval(timerInt);
-  timeLeft = document.getElementById("time").value * 60;
+
+  if (timeMode.value === "infinite") {
+    timer.textContent = "⏱ Temps infini";
+    return;
+  }
+
+  timeLeft = time.value * 60;
+  timer.textContent = "⏱ " + timeLeft + "s";
+
   timerInt = setInterval(()=>{
     timeLeft--;
-    timer.textContent = "⏱️ "+timeLeft+"s";
+    timer.textContent = "⏱ " + timeLeft + "s";
+
     if(timeLeft<=0){
       clearInterval(timerInt);
       alert("Fin de partie\n" +
@@ -144,28 +152,28 @@ function updateUI(){
     joueurs.map((j,i)=>`${j} : ${scores[i]}`).join(" | ");
 }
 
-document.getElementById("startBtn").onclick = ()=>{
+startBtn.onclick = ()=>{
   filmsJoues.clear();
   joueurs=[]; scores=[]; joueurActuel=0;
   films.innerHTML="";
 
   if(mode.value==="multi"){
     for(let i=0;i<nbJoueurs.value;i++){
-      joueurs.push(document.getElementById("p"+i).value || `Joueur ${i+1}`);
+      joueurs.push(pseudos.querySelector("#p"+i).value || `Joueur ${i+1}`);
       scores.push(0);
     }
   } else { joueurs=["Joueur"]; scores=[0]; }
 
   randomLetter = letter.value==="random";
   if(randomLetter) pickRandomLetter();
-  else document.getElementById("activeLetter").textContent="";
+  else activeLetter.textContent="";
 
   updateUI();
   startTimer();
   game.style.display="block";
 };
 
-document.getElementById("validateBtn").onclick = async ()=>{
+validateBtn.onclick = async ()=>{
   let input = inputFilm.value.trim();
   if(!input) return;
 
@@ -177,7 +185,6 @@ document.getElementById("validateBtn").onclick = async ()=>{
   );
 
   const data = [...(await resFR.json()).results, ...(await resEN.json()).results];
-
   const cleanInput = normalize(stripDeterminant(input));
 
   const film = data.find(f=>{
@@ -209,14 +216,14 @@ document.getElementById("validateBtn").onclick = async ()=>{
   if(randomLetter) pickRandomLetter();
   updateUI();
 };
-inputFilm.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
+
+/* Validation avec Entrée */
+inputFilm.addEventListener("keydown", e=>{
+  if(e.key==="Enter"){
     e.preventDefault();
-    document.getElementById("validateBtn").click();
+    validateBtn.click();
   }
 });
-
 </script>
 </body>
 </html>
-
