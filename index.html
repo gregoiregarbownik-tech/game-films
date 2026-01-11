@@ -209,6 +209,14 @@ document.getElementById("validateBtn").onclick = async ()=>{
   if(randomLetter) pickRandomLetter();
   updateUI();
 };
+inputFilm.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("validateBtn").click();
+  }
+});
+
 </script>
 </body>
 </html>
+
